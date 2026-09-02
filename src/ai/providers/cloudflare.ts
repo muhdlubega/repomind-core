@@ -1,13 +1,13 @@
 import { z } from "zod";
 import type { ChatChunk, ChatRequest, ChatResponse } from "../../shared/types";
-import type { RepoMindModelProvider } from "./provider";
+import type { CodeLensaModelProvider } from "./provider";
 
 const responseSchema = z.union([
   z.object({ response: z.string(), usage: z.object({ prompt_tokens: z.number().optional(), completion_tokens: z.number().optional() }).optional() }),
   z.object({ result: z.object({ response: z.string() }) })
 ]);
 
-export class CloudflareWorkersAIProvider implements RepoMindModelProvider {
+export class CloudflareWorkersAIProvider implements CodeLensaModelProvider {
   readonly id = "cloudflare" as const;
   readonly supportsTools = false;
   readonly supportsStructuredOutput = false;

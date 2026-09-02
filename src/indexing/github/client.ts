@@ -39,7 +39,7 @@ export class GitHubClient {
   constructor(private readonly token?: string) {}
 
   private headers(): HeadersInit {
-    return { Accept: "application/vnd.github+json", "User-Agent": "RepoMind-Core", "X-GitHub-Api-Version": "2022-11-28", ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) };
+    return { Accept: "application/vnd.github+json", "User-Agent": "CodeLensa-Core", "X-GitHub-Api-Version": "2022-11-28", ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) };
   }
   private api(owner: string, repo: string, suffix = ""): string {
     return `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${suffix}`;

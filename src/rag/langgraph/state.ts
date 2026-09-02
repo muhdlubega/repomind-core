@@ -1,7 +1,7 @@
 import { Annotation } from "@langchain/langgraph";
 import type { Citation, QueryType, RetrievedCode } from "../../shared/types";
 
-export const RepoMindStateAnnotation = Annotation.Root({
+export const CodeLensaStateAnnotation = Annotation.Root({
   repositoryId: Annotation<string>(),
   query: Annotation<string>(),
   queryType: Annotation<QueryType>({ default: () => "general", reducer: (_current, update) => update }),
@@ -19,4 +19,4 @@ export const RepoMindStateAnnotation = Annotation.Root({
   agentMode: Annotation<boolean>({ default: () => false, reducer: (_current, update) => update })
 });
 
-export type RepoMindState = typeof RepoMindStateAnnotation.State;
+export type CodeLensaState = typeof CodeLensaStateAnnotation.State;

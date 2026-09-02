@@ -1,6 +1,6 @@
 import { END, START, StateGraph } from "@langchain/langgraph";
 import type { RuntimeConfig } from "../../shared/env";
-import type { RepoMindModelProvider } from "../../ai/providers/provider";
+import type { CodeLensaModelProvider } from "../../ai/providers/provider";
 import { generationPrompt } from "../../ai/prompts/generation";
 import { lexicalSearch } from "../retrievers/lexical";
 import { semanticSearch } from "../retrievers/semantic";
@@ -11,16 +11,16 @@ import { buildContext } from "../context/builder";
 import { citationsFromAnswer, validateCitations } from "../citations/validator";
 import { retrievalConfidence } from "../confidence/calculate";
 import { classifyQuestion, deterministicRewrite, normalizeQuestion } from "../routing/classifier";
-import { RepoMindStateAnnotation, type RepoMindState } from "./state";
+import { CodeLensaStateAnnotation, type CodeLensaState } from "./state";
 
-export interface RagGraphDependencies { env: Env; config: RuntimeConfig; provider: RepoMindModelProvider }
+export interface RagGraphDependencies { env: Env; config: RuntimeConfig; provider: CodeLensaModelProvider }
 
 export function buildRagGraph(dependencies: RagGraphDependencies) {
   const reranker = new DeterministicCodeReranker();
-  const normalize = (state: RepoMindState) => ({ query: normalizeQuestion(state.query), rewrittenQueries: [normalizeQuestion(state.query)] });
-  const classify = (state: RepoMindState) => ({ queryType: classifyQuestion(state.query) });
-  const rewrite = (state: RepoMindState) => ({ rewrittenQueries: deterministicRewrite(state.query), retryCount: state.retryCount + 1 });
-  const retrieve = async (state: RepoMindState) => {
+  const normalize = (state: CodeLensaState) => ({ query: normalizeQuestion(state.query), rewrittenQueries: [normalizeQuestion(state.query)] });
+  const classify = (state: CodeLensaState) => ({ queryType: classifyQuestion(state.query) });
+  const rewrite = (state: CodeLensaState) => ({ rewrittenQueries: deterministicRewrite(state.query), retryCount: state.retryCount + 1 });
+  const retrieve = async (state: CodeLensaState) => {
     const query = state.rewrittenQueries.at(-1) ?? state.query;
     const [symbolResults, semanticResults] = await Promise.all([
       lexicalSearch(dependencies.env.DB, state.repositoryId, query),
@@ -28,29 +28,29 @@ export function buildRagGraph(dependencies: RagGraphDependencies) {
     ]);
     return { symbolResults, semanticResults, graphResults: [] };
   };
-  const fuse = async (state: RepoMindState) => ({ fusedResults: await reranker.rerank(state.query, reciprocalRankFusion([state.symbolResults, state.semanticResults])) });
-  const expand = async (state: RepoMindState) => {
+  const fuse = async (state: CodeLensaState) => ({ fusedResults: await reranker.rerank(state.query, reciprocalRankFusion([state.symbolResults, state.semanticResults])) });
+  const expand = async (state: CodeLensaState) => {
     if (!["architecture", "debugging", "impact", "testing"].includes(state.queryType)) return { graphResults: [], fusedResults: state.fusedResults };
     const relationships = state.queryType === "testing" ? ["TESTS" as const, "IMPORTS" as const, "REFERENCES" as const] : undefined;
     const graphResults = await graphSearch(dependencies.env.DB, state.repositoryId, state.fusedResults.slice(0, 5).map((item) => item.id), { depth: dependencies.config.MAX_GRAPH_DEPTH, ...(relationships ? { relationships } : {}) });
     return { graphResults, fusedResults: await reranker.rerank(state.query, reciprocalRankFusion([state.symbolResults, state.semanticResults, graphResults])) };
   };
-  const context = (state: RepoMindState) => ({ context: buildContext(state.fusedResults) });
-  const check = (state: RepoMindState) => ({ retrievalConfidence: retrievalConfidence(state.fusedResults, state.context, []) });
-  const routeContext = (state: RepoMindState): "retry" | "good" => state.context.length < 2 && state.retryCount < 1 ? "retry" : "good";
-  const generate = async (state: RepoMindState) => {
+  const context = (state: CodeLensaState) => ({ context: buildContext(state.fusedResults) });
+  const check = (state: CodeLensaState) => ({ retrievalConfidence: retrievalConfidence(state.fusedResults, state.context, []) });
+  const routeContext = (state: CodeLensaState): "retry" | "good" => state.context.length < 2 && state.retryCount < 1 ? "retry" : "good";
+  const generate = async (state: CodeLensaState) => {
     if (!state.context.length) return { answer: "I could not find enough repository evidence to answer this question reliably.", citations: [] };
     const response = await dependencies.provider.chat({ messages: [{ role: "user", content: generationPrompt(state.query, state.context) }], temperature: 0.1, maxTokens: 1500 });
     return { answer: response.content, citations: citationsFromAnswer(response.content, state.context) };
   };
-  const validate = async (state: RepoMindState) => {
+  const validate = async (state: CodeLensaState) => {
     const validation = await validateCitations(dependencies.env.DB, state.repositoryId, state.citations, state.context);
     const answer = validation.invalid.length && !validation.valid.length ? "The retrieved evidence was insufficient to produce a citation-valid answer." : state.answer;
     return { citations: validation.valid, citationValidity: validation.validity, answer };
   };
-  const confidence = (state: RepoMindState) => ({ retrievalConfidence: retrievalConfidence(state.fusedResults, state.context, state.citations) });
+  const confidence = (state: CodeLensaState) => ({ retrievalConfidence: retrievalConfidence(state.fusedResults, state.context, state.citations) });
 
-  return new StateGraph(RepoMindStateAnnotation)
+  return new StateGraph(CodeLensaStateAnnotation)
     .addNode("normalize_question", normalize)
     .addNode("classify_question", classify)
     .addNode("rewrite_question", rewrite)

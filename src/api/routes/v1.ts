@@ -11,7 +11,7 @@ import { parsePublicGitHubUrl } from "../../security/github-url";
 import { ensureUser, getAccessibleRepository } from "../../db/repositories/repositories";
 import { consumeQueryQuota } from "../middleware/rate-limit";
 import { searchRepository, retrievalCacheKey } from "../../rag/search";
-import type { RetrievedCode, RepoMindAnswer } from "../../shared/types";
+import type { RetrievedCode, CodeLensaAnswer } from "../../shared/types";
 import { ModelRegistry } from "../../ai/registry/models";
 import { buildRagGraph } from "../../rag/langgraph/graph";
 import { buildInvestigationGraph } from "../../agent/graph";
@@ -36,7 +36,7 @@ async function removeRepositoryObjects(env: Env, repositoryId: string): Promise<
   } while (cursor);
 }
 
-async function persistAnswer(env: Env, repositoryId: string, userId: string | null, mode: "ask" | "investigate", query: string, answer: RepoMindAnswer, conversationId?: string): Promise<string> {
+async function persistAnswer(env: Env, repositoryId: string, userId: string | null, mode: "ask" | "investigate", query: string, answer: CodeLensaAnswer, conversationId?: string): Promise<string> {
   const conversation = conversationId ?? crypto.randomUUID();
   if (!conversationId) await env.DB.prepare("INSERT INTO conversations (id, repository_id, user_id, mode) VALUES (?, ?, ?, ?)").bind(conversation, repositoryId, userId, mode).run();
   const userMessageId = crypto.randomUUID();
@@ -146,15 +146,15 @@ v1.post("/repositories/:id/chat", async (context) => {
   if (request.mode === "ask") {
     const state = await buildRagGraph({ env: context.env, config, provider }).invoke({ repositoryId: id, query: request.query, agentMode: false });
     const completed = Date.now();
-    const answer: RepoMindAnswer = { id: crypto.randomUUID(), answer: state.answer, citations: state.citations, retrieval: { queryType: state.queryType, chunksRetrieved: state.fusedResults.length, filesUsed: new Set(state.context.map((item) => item.path)).size, confidence: state.retrievalConfidence }, model: { provider: provider.id, model: provider.model }, timing: { retrievalMs: Math.max(0, completed - retrievalStarted), generationMs: 0, totalMs: completed - started } };
-    context.executionCtx.waitUntil(traceCompletedRun(config, "repomind.ask", { repositoryId: id, query: request.query }, { citations: answer.citations.length, confidence: answer.retrieval.confidence, provider: answer.model.provider }));
+    const answer: CodeLensaAnswer = { id: crypto.randomUUID(), answer: state.answer, citations: state.citations, retrieval: { queryType: state.queryType, chunksRetrieved: state.fusedResults.length, filesUsed: new Set(state.context.map((item) => item.path)).size, confidence: state.retrievalConfidence }, model: { provider: provider.id, model: provider.model }, timing: { retrievalMs: Math.max(0, completed - retrievalStarted), generationMs: 0, totalMs: completed - started } };
+    context.executionCtx.waitUntil(traceCompletedRun(config, "codelensa.ask", { repositoryId: id, query: request.query }, { citations: answer.citations.length, confidence: answer.retrieval.confidence, provider: answer.model.provider }));
     const conversationId = await persistAnswer(context.env, id, context.get("principal").userId, request.mode, request.query, answer, request.conversationId);
     return context.json(success({ ...answer, conversationId }));
   }
   const state = await buildInvestigationGraph(context.env, config, provider).invoke({ repositoryId: id, query: request.query });
   const completed = Date.now();
-  const answer: RepoMindAnswer = { id: crypto.randomUUID(), answer: state.answer, citations: state.citations, retrieval: { queryType: classifyQuestion(request.query), chunksRetrieved: state.evidence.length, filesUsed: new Set(state.evidence.map((item) => item.path)).size, confidence: retrievalConfidence(state.evidence, buildContext(state.evidence), state.citations) }, model: { provider: provider.id, model: provider.model }, timing: { retrievalMs: completed - retrievalStarted, generationMs: 0, totalMs: completed - started } };
-  context.executionCtx.waitUntil(traceCompletedRun(config, "repomind.investigate", { repositoryId: id, query: request.query }, { citations: answer.citations.length, confidence: answer.retrieval.confidence, provider: answer.model.provider, iterations: state.iterationCount }));
+  const answer: CodeLensaAnswer = { id: crypto.randomUUID(), answer: state.answer, citations: state.citations, retrieval: { queryType: classifyQuestion(request.query), chunksRetrieved: state.evidence.length, filesUsed: new Set(state.evidence.map((item) => item.path)).size, confidence: retrievalConfidence(state.evidence, buildContext(state.evidence), state.citations) }, model: { provider: provider.id, model: provider.model }, timing: { retrievalMs: completed - retrievalStarted, generationMs: 0, totalMs: completed - started } };
+  context.executionCtx.waitUntil(traceCompletedRun(config, "codelensa.investigate", { repositoryId: id, query: request.query }, { citations: answer.citations.length, confidence: answer.retrieval.confidence, provider: answer.model.provider, iterations: state.iterationCount }));
   const conversationId = await persistAnswer(context.env, id, context.get("principal").userId, request.mode, request.query, answer, request.conversationId);
   return context.json(success({ ...answer, conversationId, investigation: { iterations: state.iterationCount, toolCalls: state.toolCalls } }));
 });
@@ -208,7 +208,7 @@ v1.post("/repositories/:id/chat/stream", async (context) => {
       for (const citation of validated.valid) await stream.writeSSE({ event: "citation", data: JSON.stringify(citation) });
       await stream.writeSSE({ event: "completed", data: JSON.stringify({ citations: validated.valid, retrievalConfidence: retrievalConfidence(results, evidence, validated.valid), citationValidity: validated.validity }) });
     } catch (error) {
-      const message = error instanceof Error && error.message === "AI_DAILY_CAPACITY_REACHED" ? "RepoMind's free AI capacity has been reached. Try again later or use a configured external provider." : "The streamed request failed.";
+      const message = error instanceof Error && error.message === "AI_DAILY_CAPACITY_REACHED" ? "CodeLensa's free AI capacity has been reached. Try again later or use a configured external provider." : "The streamed request failed.";
       await stream.writeSSE({ event: "error", data: JSON.stringify({ code: error instanceof Error && error.message === "AI_DAILY_CAPACITY_REACHED" ? "AI_DAILY_CAPACITY_REACHED" : "STREAM_FAILED", message }) });
     }
   });

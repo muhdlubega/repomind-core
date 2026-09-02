@@ -47,7 +47,7 @@ export interface ChatRequest {
 export interface ChatResponse { content: string; inputTokens?: number; outputTokens?: number }
 export interface ChatChunk { content: string }
 
-export interface RepoMindAnswer {
+export interface CodeLensaAnswer {
   id: string;
   answer: string;
   citations: Citation[];

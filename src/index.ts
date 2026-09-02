@@ -33,7 +33,7 @@ app.notFound((context) => context.json(failure("NOT_FOUND", "Route not found."),
 app.onError((error, context) => {
   const normalized = normalizeError(error);
   console.error(JSON.stringify({ message: "request failed", code: normalized.code, error: error instanceof Error ? error.message : String(error), path: context.req.path }));
-  if (error instanceof Error && error.message === "AI_DAILY_CAPACITY_REACHED") return context.json(failure("AI_DAILY_CAPACITY_REACHED", "RepoMind's free AI capacity has been reached. Try again later or use a configured external provider."), 503);
+  if (error instanceof Error && error.message === "AI_DAILY_CAPACITY_REACHED") return context.json(failure("AI_DAILY_CAPACITY_REACHED", "CodeLensa's free AI capacity has been reached. Try again later or use a configured external provider."), 503);
   return context.json(failure(normalized.code, normalized.message, normalized.details), normalized.status as 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500 | 502 | 503);
 });
 

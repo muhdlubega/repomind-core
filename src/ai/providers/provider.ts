@@ -1,6 +1,6 @@
 import type { ChatChunk, ChatRequest, ChatResponse, ProviderId } from "../../shared/types";
 
-export interface RepoMindModelProvider {
+export interface CodeLensaModelProvider {
   readonly id: ProviderId;
   readonly model: string;
   readonly supportsTools: boolean;

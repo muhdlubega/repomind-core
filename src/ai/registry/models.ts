@@ -3,7 +3,7 @@ import type { RuntimeConfig } from "../../shared/env";
 import { AppError } from "../../shared/errors";
 import { CloudflareWorkersAIProvider } from "../providers/cloudflare";
 import { createGeminiProvider, createMistralProvider } from "../providers/openai-compatible";
-import type { RepoMindModelProvider } from "../providers/provider";
+import type { CodeLensaModelProvider } from "../providers/provider";
 
 export type ModelPurpose = "generation" | "classification" | "rewrite" | "agent";
 export interface ModelDefinition { provider: ProviderId; model: string; purpose: ModelPurpose }
@@ -18,7 +18,7 @@ export class ModelRegistry {
     return { provider, model: this.config.MISTRAL_MODEL ?? this.config.AGENT_MODEL ?? "", purpose };
   }
 
-  provider(purpose: ModelPurpose, requested?: ProviderId): RepoMindModelProvider {
+  provider(purpose: ModelPurpose, requested?: ProviderId): CodeLensaModelProvider {
     let definition = this.definition(purpose, requested);
     if (definition.provider !== "cloudflare" && purpose === "agent" && !this.config.ENABLE_EXTERNAL_AGENT) definition = this.definition(purpose, "cloudflare");
     if (definition.provider === "cloudflare") return new CloudflareWorkersAIProvider(this.env.AI, definition.model);

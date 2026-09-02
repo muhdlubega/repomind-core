@@ -1,6 +1,6 @@
-# RepoMind Core
+# CodeLensa Core
 
-RepoMind Core is a Cloudflare-native code intelligence and repository RAG backend. It indexes public GitHub repositories asynchronously, extracts code structure, builds lexical, semantic, and dependency indexes, and answers repository questions with server-verified file/symbol/line citations.
+CodeLensa Core is a Cloudflare-native code intelligence and repository RAG backend. It indexes public GitHub repositories asynchronously, extracts code structure, builds lexical, semantic, and dependency indexes, and answers repository questions with server-verified file/symbol/line citations.
 
 The normal path runs on Workers AI. Gemini and Mistral are optional OpenAI-compatible providers and are never selected unless deployment configuration explicitly allows them. LangSmith is optional, sampled, disabled by default, and not a deployment dependency.
 
@@ -8,7 +8,7 @@ The normal path runs on Workers AI. Gemini and Mistral are optional OpenAI-compa
 
 ```mermaid
 flowchart LR
-  Web[repomind-web / API client] --> Worker[Hono Worker]
+  Web[codelensa-web / API client] --> Worker[Hono Worker]
   Worker --> Auth[Firebase token verifier]
   Worker --> D1[(D1 metadata + FTS5 + graph)]
   Worker --> KV[(KV cache + auth keys)]
@@ -27,9 +27,9 @@ flowchart LR
 
 The same Worker exports both `fetch` and Queue consumer handlers. Queue messages contain identifiers only; repository content remains in R2/D1/Vectorize.
 
-## Why RepoMind is not a basic vector RAG
+## Why CodeLensa is not a basic vector RAG
 
-RepoMind combines:
+CodeLensa combines:
 
 - AST-aware semantic chunking around functions, classes, methods, hooks, interfaces, and modules
 - exact symbol and FTS5 lexical search in D1
@@ -109,10 +109,10 @@ Tools perform data retrieval only: code/symbol search, semantic search, callers/
 
 ## Provider architecture
 
-All generation is behind `RepoMindModelProvider`:
+All generation is behind `CodeLensaModelProvider`:
 
 ```ts
-interface RepoMindModelProvider {
+interface CodeLensaModelProvider {
   id: "cloudflare" | "gemini" | "mistral";
   model: string;
   chat(request: ChatRequest): Promise<ChatResponse>;
@@ -255,13 +255,13 @@ MISTRAL_MODEL=<model available to your account>
 MISTRAL_API_KEY=<secret>
 ```
 
-External allocation and pricing change. RepoMind does not assume any external model is permanently free.
+External allocation and pricing change. CodeLensa does not assume any external model is permanently free.
 
 ## Optional LangSmith
 
 ```dotenv
 LANGSMITH_TRACING=true
-LANGSMITH_PROJECT=repomind
+LANGSMITH_PROJECT=codelensa
 LANGSMITH_SAMPLE_RATE=0.05
 LANGSMITH_API_KEY=<secret>
 ```

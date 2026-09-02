@@ -12,5 +12,5 @@ export async function traceCompletedRun(config: RuntimeConfig, name: string, inp
   if (!config.LANGSMITH_TRACING || !config.LANGSMITH_API_KEY || !sampled(config.LANGSMITH_SAMPLE_RATE)) return;
   const client = new Client({ apiKey: config.LANGSMITH_API_KEY, autoBatchTracing: false, timeout_ms: 5_000, hideInputs: false, hideOutputs: false });
   const now = Date.now();
-  await client.createRun({ id: crypto.randomUUID(), name, run_type: "chain", project_name: config.LANGSMITH_PROJECT, start_time: now, end_time: now, inputs, outputs, extra: { metadata: { service: "repomind-core", environment: config.ENVIRONMENT } } });
+  await client.createRun({ id: crypto.randomUUID(), name, run_type: "chain", project_name: config.LANGSMITH_PROJECT, start_time: now, end_time: now, inputs, outputs, extra: { metadata: { service: "codelensa-core", environment: config.ENVIRONMENT } } });
 }

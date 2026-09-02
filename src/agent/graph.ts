@@ -2,7 +2,7 @@ import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 import { z } from "zod";
 import type { RuntimeConfig } from "../shared/env";
 import type { Citation, RetrievedCode } from "../shared/types";
-import type { RepoMindModelProvider } from "../ai/providers/provider";
+import type { CodeLensaModelProvider } from "../ai/providers/provider";
 import { generationPrompt } from "../ai/prompts/generation";
 import { buildContext } from "../rag/context/builder";
 import { citationsFromAnswer, validateCitations } from "../rag/citations/validator";
@@ -32,7 +32,7 @@ const Investigation = Annotation.Root({
 });
 type State = typeof Investigation.State;
 
-export function buildInvestigationGraph(env: Env, config: RuntimeConfig, provider: RepoMindModelProvider) {
+export function buildInvestigationGraph(env: Env, config: RuntimeConfig, provider: CodeLensaModelProvider) {
   const plan = async (state: State) => {
     if (state.iterationCount === 0) return { nextTool: "search_code" as const, nextQuery: state.query, enoughEvidence: false };
     if (state.evidence.length >= 8 || state.iterationCount >= config.AGENT_MAX_ITERATIONS) return { enoughEvidence: true };

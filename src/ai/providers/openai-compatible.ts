@@ -1,8 +1,8 @@
 import OpenAI from "openai";
 import type { ChatChunk, ChatRequest, ChatResponse, ProviderId } from "../../shared/types";
-import type { RepoMindModelProvider } from "./provider";
+import type { CodeLensaModelProvider } from "./provider";
 
-export class OpenAICompatibleProvider implements RepoMindModelProvider {
+export class OpenAICompatibleProvider implements CodeLensaModelProvider {
   readonly supportsTools = true;
   readonly supportsStructuredOutput = true;
   private readonly client: OpenAI;

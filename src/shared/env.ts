@@ -23,7 +23,7 @@ export const runtimeConfigSchema = z.object({
   AGENT_MAX_ITERATIONS: positiveInt.max(12).default(6),
   LANGSMITH_TRACING: boolString.default("false"),
   LANGSMITH_API_KEY: z.string().optional(),
-  LANGSMITH_PROJECT: z.string().default("repomind"),
+  LANGSMITH_PROJECT: z.string().default("codelensa"),
   LANGSMITH_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
   ANONYMOUS_DAILY_QUERIES: positiveInt.default(5),
   AUTHENTICATED_DAILY_QUERIES: positiveInt.default(20),
