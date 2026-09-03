@@ -179,7 +179,7 @@ Wrangler simulates D1, KV, R2, and Queues locally. Workers AI is configured as a
 Apply local migrations:
 
 ```bash
-npx wrangler d1 migrations apply repomind --local
+npx wrangler d1 migrations apply codelensa --local
 ```
 
 ## Cloudflare provisioning
@@ -187,12 +187,12 @@ npx wrangler d1 migrations apply repomind --local
 Create resources once, then replace the placeholder IDs in `wrangler.jsonc`:
 
 ```bash
-npx wrangler d1 create repomind
-npx wrangler r2 bucket create repomind-repositories
+npx wrangler d1 create codelensa
+npx wrangler r2 bucket create codelensa-repositories
 npx wrangler kv namespace create CACHE
-npx wrangler queues create repomind-indexing
-npx wrangler queues create repomind-indexing-dlq
-npx wrangler vectorize create repomind-code --dimensions 768 --metric cosine
+npx wrangler queues create codelensa-indexing
+npx wrangler queues create codelensa-indexing-dlq
+npx wrangler vectorize create codelensa-code --dimensions 768 --metric cosine
 ```
 
 The default `@cf/baai/bge-base-en-v1.5` embedding configuration uses 768 dimensions. If the embedding model changes, create a matching index and update both `CLOUDFLARE_EMBEDDING_MODEL` and the Vectorize binding. The namespace is the repository ID, providing a hard query partition in addition to D1 ownership checks.
@@ -200,7 +200,7 @@ The default `@cf/baai/bge-base-en-v1.5` embedding configuration uses 768 dimensi
 Apply production migrations and validate binding types:
 
 ```bash
-npx wrangler d1 migrations apply repomind --remote
+npx wrangler d1 migrations apply codelensa --remote
 npm run cf-types
 ```
 
@@ -209,11 +209,11 @@ npm run cf-types
 Build or obtain Worker-compatible Tree-sitter WASM grammars from the upstream language grammar projects, verify their checksums, and upload them to the private bucket:
 
 ```bash
-npx wrangler r2 object put repomind-repositories/grammars/web-tree-sitter.wasm --file ./node_modules/web-tree-sitter/web-tree-sitter.wasm
-npx wrangler r2 object put repomind-repositories/grammars/tree-sitter-typescript.wasm --file ./grammars/tree-sitter-typescript.wasm
-npx wrangler r2 object put repomind-repositories/grammars/tree-sitter-tsx.wasm --file ./grammars/tree-sitter-tsx.wasm
-npx wrangler r2 object put repomind-repositories/grammars/tree-sitter-javascript.wasm --file ./grammars/tree-sitter-javascript.wasm
-npx wrangler r2 object put repomind-repositories/grammars/tree-sitter-python.wasm --file ./grammars/tree-sitter-python.wasm
+npx wrangler r2 object put codelensa-repositories/grammars/web-tree-sitter.wasm --file ./node_modules/web-tree-sitter/web-tree-sitter.wasm
+npx wrangler r2 object put codelensa-repositories/grammars/tree-sitter-typescript.wasm --file ./grammars/tree-sitter-typescript.wasm
+npx wrangler r2 object put codelensa-repositories/grammars/tree-sitter-tsx.wasm --file ./grammars/tree-sitter-tsx.wasm
+npx wrangler r2 object put codelensa-repositories/grammars/tree-sitter-javascript.wasm --file ./grammars/tree-sitter-javascript.wasm
+npx wrangler r2 object put codelensa-repositories/grammars/tree-sitter-python.wasm --file ./grammars/tree-sitter-python.wasm
 ```
 
 Do not put secret values in `wrangler.jsonc`. Configure them interactively:

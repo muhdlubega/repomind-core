@@ -11,6 +11,12 @@ export interface ModelDefinition { provider: ProviderId; model: string; purpose:
 export class ModelRegistry {
   constructor(private readonly env: Env, private readonly config: RuntimeConfig) {}
 
+  private hasCredentials(definition: ModelDefinition): boolean {
+    if (definition.provider === "cloudflare") return Boolean(definition.model);
+    if (definition.provider === "gemini") return Boolean(this.config.GEMINI_API_KEY && definition.model);
+    return Boolean(this.config.MISTRAL_API_KEY && definition.model);
+  }
+
   definition(purpose: ModelPurpose, requested?: ProviderId): ModelDefinition {
     const provider = requested ?? (purpose === "agent" ? this.config.AGENT_PROVIDER : this.config.AI_PROVIDER);
     if (provider === "cloudflare") return { provider, model: purpose === "agent" && this.config.AGENT_MODEL ? this.config.AGENT_MODEL : this.config.CLOUDFLARE_CHAT_MODEL, purpose };
@@ -29,9 +35,12 @@ export class ModelRegistry {
   }
 
   list(): ModelDefinition[] {
-    const models = [this.definition("generation", "cloudflare")];
-    if (this.config.GEMINI_API_KEY && this.config.GEMINI_MODEL) models.push(this.definition("agent", "gemini"));
-    if (this.config.MISTRAL_API_KEY && this.config.MISTRAL_MODEL) models.push(this.definition("agent", "mistral"));
+    const models: ModelDefinition[] = [];
+    const generation = this.definition("generation");
+    if (this.hasCredentials(generation)) models.push(generation);
+    const configuredAgent = this.definition("agent");
+    const agent = configuredAgent.provider !== "cloudflare" && !this.config.ENABLE_EXTERNAL_AGENT ? this.definition("agent", "cloudflare") : configuredAgent;
+    if (this.hasCredentials(agent) && !models.some((model) => model.provider === agent.provider && model.model === agent.model && model.purpose === agent.purpose)) models.push(agent);
     return models;
   }
 }
