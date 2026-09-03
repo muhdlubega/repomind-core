@@ -23,7 +23,7 @@ import { retrievalConfidence } from "../../rag/confidence/calculate";
 import { classifyQuestion } from "../../rag/routing/classifier";
 import { graphForSymbol } from "../../rag/retrievers/graph";
 import { traceCompletedRun } from "../../telemetry/langsmith";
-import { buildDemoAnswer, demoFiles, demoRepository, filterDemoSearch } from "../../demo/fixtures";
+import { buildDemoAnswer, buildDemoEvaluationRun, demoEvaluationRuns, demoFiles, demoRepository, filterDemoSearch } from "../../demo/fixtures";
 
 const idSchema = z.string().uuid();
 const paginationSchema = z.object({ limit: z.coerce.number().int().min(1).max(100).default(50), cursor: z.string().optional() });
@@ -156,6 +156,29 @@ async function streamDemoChat(context: Context<AppBindings>) {
 
 v1.get("/repositories/demo/chat/stream", streamDemoChat);
 v1.post("/repositories/demo/chat/stream", streamDemoChat);
+
+v1.get("/evaluations", (context) => context.json(success(demoEvaluationRuns)));
+
+v1.get("/evaluations/run", (context) => context.json(success(buildDemoEvaluationRun())));
+
+v1.post("/evaluations/run", async (context) => {
+  let body: unknown = {};
+  try {
+    body = await context.req.json();
+  } catch {
+    body = {};
+  }
+  const maybeRepositoryId = z.object({ repositoryId: z.string().optional() }).passthrough().parse(body).repositoryId;
+  if (!maybeRepositoryId || maybeRepositoryId === demoRepository.id) return context.json(success(buildDemoEvaluationRun()), 202);
+  const principal = context.get("principal");
+  if (principal.anonymous) throw new AppError("AUTHENTICATION_REQUIRED", "Authentication is required.", 401);
+  const request = evaluationRunSchema.parse(body);
+  await getAccessibleRepository(context.env.DB, request.repositoryId, principal);
+  const runId = crypto.randomUUID();
+  await context.env.DB.prepare("INSERT INTO evaluation_runs (id, repository_id, strategy, status) VALUES (?, ?, ?, 'running')").bind(runId, request.repositoryId, request.strategy).run();
+  await context.env.INDEX_QUEUE.send({ kind: "evaluation", repositoryId: request.repositoryId, runId, strategy: request.strategy });
+  return context.json(success({ runId, status: "running" }), 202);
+});
 
 v1.get("/repositories/:id", async (context) => context.json(success(await getAccessibleRepository(context.env.DB, idSchema.parse(context.req.param("id")), context.get("principal")))));
 
@@ -338,15 +361,6 @@ v1.get("/repositories/:id/evaluations", async (context) => {
   await getAccessibleRepository(context.env.DB, id, context.get("principal"));
   const [cases, runs] = await Promise.all([context.env.DB.prepare("SELECT * FROM evaluation_cases WHERE repository_id = ? ORDER BY created_at DESC").bind(id).all(), context.env.DB.prepare("SELECT * FROM evaluation_runs WHERE repository_id = ? ORDER BY created_at DESC LIMIT 50").bind(id).all()]);
   return context.json(success({ cases: cases.results, runs: runs.results }));
-});
-
-v1.post("/evaluations/run", requireAuth, async (context) => {
-  const request = evaluationRunSchema.parse(await context.req.json());
-  await getAccessibleRepository(context.env.DB, request.repositoryId, context.get("principal"));
-  const runId = crypto.randomUUID();
-  await context.env.DB.prepare("INSERT INTO evaluation_runs (id, repository_id, strategy, status) VALUES (?, ?, ?, 'running')").bind(runId, request.repositoryId, request.strategy).run();
-  await context.env.INDEX_QUEUE.send({ kind: "evaluation", repositoryId: request.repositoryId, runId, strategy: request.strategy });
-  return context.json(success({ runId, status: "running" }), 202);
 });
 
 v1.get("/evaluations/:runId", async (context) => {

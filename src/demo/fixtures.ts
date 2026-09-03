@@ -106,6 +106,66 @@ export const demoSearchResults: RetrievedCode[] = [
   }
 ];
 
+export const demoEvaluationRuns = [
+  {
+    id: "eval_019",
+    status: "completed",
+    createdAt: timestamp,
+    created_at: timestamp,
+    dataset: "core-architecture-v2",
+    repositoryId: demoRepository.id,
+    repository_id: demoRepository.id,
+    strategy: "hybrid_graph_rerank",
+    scores: {
+      retrievalHitRate: 0.91,
+      citationPrecision: 0.96,
+      answerFaithfulness: 0.93,
+      avgLatencyMs: 1840
+    },
+    retrieval_hit_rate: 0.91,
+    citation_precision: 0.96,
+    answer_faithfulness: 0.93,
+    avg_latency_ms: 1840
+  },
+  {
+    id: "eval_018",
+    status: "completed",
+    createdAt: "2026-09-02T00:00:00.000Z",
+    created_at: "2026-09-02T00:00:00.000Z",
+    dataset: "core-architecture-v2",
+    repositoryId: demoRepository.id,
+    repository_id: demoRepository.id,
+    strategy: "hybrid_graph_rerank",
+    scores: {
+      retrievalHitRate: 0.87,
+      citationPrecision: 0.92,
+      answerFaithfulness: 0.89,
+      avgLatencyMs: 2130
+    },
+    retrieval_hit_rate: 0.87,
+    citation_precision: 0.92,
+    answer_faithfulness: 0.89,
+    avg_latency_ms: 2130
+  }
+];
+
+export function buildDemoEvaluationRun() {
+  return {
+    id: `eval_${crypto.randomUUID()}`,
+    status: "completed",
+    createdAt: new Date().toISOString(),
+    dataset: "core-architecture-v2",
+    repositoryId: demoRepository.id,
+    strategy: "hybrid_graph_rerank",
+    scores: {
+      retrievalHitRate: 0.93,
+      citationPrecision: 0.96,
+      answerFaithfulness: 0.94,
+      avgLatencyMs: 1760
+    }
+  };
+}
+
 export function filterDemoSearch(query: string, limit = 20): RetrievedCode[] {
   const needle = query.trim().toLowerCase();
   const terms = needle.split(/\s+/).filter(Boolean);
