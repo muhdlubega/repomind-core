@@ -10,7 +10,7 @@ export async function ensureUser(db: D1Database, principal: Principal): Promise<
 }
 
 export async function getAccessibleRepository(db: D1Database, repositoryId: string, principal: Principal): Promise<RepositoryRow> {
-  const row = await db.prepare("SELECT * FROM repositories WHERE id = ? AND (is_demo = 1 OR owner_id = ?)").bind(repositoryId, principal.userId).first<RepositoryRow>();
+  const row = await db.prepare("SELECT * FROM repositories WHERE id = ? AND (is_demo = 1 OR owner_id IS NULL OR owner_id = ?)").bind(repositoryId, principal.userId).first<RepositoryRow>();
   if (!row) throw new AppError("REPOSITORY_NOT_FOUND", "Repository was not found or is not accessible.", 404);
   return row;
 }

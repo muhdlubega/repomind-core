@@ -9,7 +9,7 @@ import { success } from "../responses/json";
 import { getConfig } from "../../shared/env";
 import { AppError } from "../../shared/errors";
 import { parsePublicGitHubUrl } from "../../security/github-url";
-import { ensureUser, getAccessibleRepository } from "../../db/repositories/repositories";
+import { getAccessibleRepository } from "../../db/repositories/repositories";
 import { consumeQueryQuota } from "../middleware/rate-limit";
 import { searchRepository, retrievalCacheKey } from "../../rag/search";
 import type { RetrievedCode, CodeLensaAnswer } from "../../shared/types";
@@ -62,16 +62,12 @@ v1.get("/usage", async (context) => {
   return context.json(success(rows.results));
 });
 
-v1.post("/repositories", requireAuth, async (context) => {
+v1.post("/repositories", async (context) => {
   const body = createRepositorySchema.parse(await context.req.json());
   const reference = parsePublicGitHubUrl(body.githubUrl);
-  const principal = context.get("principal");
-  const config = getConfig(context.env);
-  const ownerId = await ensureUser(context.env.DB, principal);
-  const count = await context.env.DB.prepare("SELECT COUNT(*) AS total FROM repositories WHERE owner_id = ?").bind(ownerId).first<{ total: number }>();
-  if ((count?.total ?? 0) >= config.MAX_REPOSITORIES_PER_USER) throw new AppError("REPOSITORY_LIMIT_REACHED", "Repository limit reached for this account.", 409);
-  const existing = await context.env.DB.prepare("SELECT id, status FROM repositories WHERE owner_id = ? AND lower(github_owner) = lower(?) AND lower(github_repo) = lower(?)").bind(ownerId, reference.owner, reference.repo).first<{ id: string; status: string }>();
-  if (existing) return context.json(success(existing), 200);
+  const ownerId: string | null = null;
+  const existing = await context.env.DB.prepare("SELECT id, status FROM repositories WHERE lower(github_owner) = lower(?) AND lower(github_repo) = lower(?) AND (owner_id IS NULL OR owner_id IS ?) ORDER BY owner_id IS NOT NULL DESC LIMIT 1").bind(reference.owner, reference.repo, ownerId).first<{ id: string; status: string }>();
+  if (existing) return context.json(success({ repositoryId: existing.id, status: existing.status }), 200);
   const repositoryId = crypto.randomUUID();
   const jobId = crypto.randomUUID();
   await context.env.DB.batch([
@@ -84,7 +80,7 @@ v1.post("/repositories", requireAuth, async (context) => {
 
 v1.get("/repositories", async (context) => {
   const principal = context.get("principal");
-  const rows = await context.env.DB.prepare("SELECT id, github_url, github_owner, github_repo, default_branch, commit_sha, status, is_demo, indexed_at, created_at, updated_at FROM repositories WHERE is_demo = 1 OR owner_id = ? ORDER BY created_at DESC LIMIT 100").bind(principal.userId).all();
+  const rows = await context.env.DB.prepare("SELECT id, github_url, github_owner, github_repo, default_branch, commit_sha, status, is_demo, indexed_at, created_at, updated_at FROM repositories WHERE is_demo = 1 OR owner_id IS NULL OR owner_id = ? ORDER BY is_demo ASC, created_at DESC LIMIT 100").bind(principal.userId).all();
   const repositories = rows.results.some((row) => (row as { id?: unknown }).id === demoRepository.id) ? rows.results : [demoRepository, ...rows.results];
   return context.json(success(repositories));
 });
@@ -201,9 +197,10 @@ v1.get("/repositories/:id/index-status", async (context) => {
   return context.json(success(job));
 });
 
-v1.post("/repositories/:id/reindex", requireAuth, async (context) => {
+v1.post("/repositories/:id/reindex", async (context) => {
   const id = idSchema.parse(context.req.param("id"));
   const repository = await getAccessibleRepository(context.env.DB, id, context.get("principal"));
+  if (repository.is_demo) throw new AppError("DEMO_REPOSITORY_IMMUTABLE", "Demo repositories cannot be reindexed.", 403);
   const jobId = crypto.randomUUID();
   await context.env.DB.prepare("INSERT INTO repository_jobs (id, repository_id, status) VALUES (?, ?, 'queued')").bind(jobId, id).run();
   await context.env.DB.prepare("UPDATE repositories SET status = 'queued', updated_at = datetime('now') WHERE id = ?").bind(id).run();
