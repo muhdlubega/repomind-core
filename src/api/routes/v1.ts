@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
+import type { Context } from "hono";
 import type { AppBindings } from "../middleware/auth";
 import { requireAuth } from "../middleware/auth";
 import { createRepositorySchema, chatSchema, evaluationRunSchema, searchSchema } from "../schemas/requests";
@@ -22,6 +23,7 @@ import { retrievalConfidence } from "../../rag/confidence/calculate";
 import { classifyQuestion } from "../../rag/routing/classifier";
 import { graphForSymbol } from "../../rag/retrievers/graph";
 import { traceCompletedRun } from "../../telemetry/langsmith";
+import { buildDemoAnswer, demoFiles, demoRepository, filterDemoSearch } from "../../demo/fixtures";
 
 const idSchema = z.string().uuid();
 const paginationSchema = z.object({ limit: z.coerce.number().int().min(1).max(100).default(50), cursor: z.string().optional() });
@@ -83,8 +85,77 @@ v1.post("/repositories", requireAuth, async (context) => {
 v1.get("/repositories", async (context) => {
   const principal = context.get("principal");
   const rows = await context.env.DB.prepare("SELECT id, github_url, github_owner, github_repo, default_branch, commit_sha, status, is_demo, indexed_at, created_at, updated_at FROM repositories WHERE is_demo = 1 OR owner_id = ? ORDER BY created_at DESC LIMIT 100").bind(principal.userId).all();
-  return context.json(success(rows.results));
+  const repositories = rows.results.some((row) => (row as { id?: unknown }).id === demoRepository.id) ? rows.results : [demoRepository, ...rows.results];
+  return context.json(success(repositories));
 });
+
+v1.get("/repositories/demo", (context) => context.json(success(demoRepository)));
+
+v1.get("/repositories/demo/index-status", (context) =>
+  context.json(
+    success({
+      repository_id: demoRepository.id,
+      status: "completed",
+      stage: "ready",
+      progress: 1,
+      files_processed: demoFiles.length,
+      total_files: demoFiles.length,
+      chunks_created: filterDemoSearch("").length,
+      symbols_created: 3,
+      message: "Demo repository is ready."
+    })
+  )
+);
+
+v1.get("/repositories/demo/files", (context) => {
+  const pagination = paginationSchema.parse(context.req.query());
+  const items = demoFiles.filter((file) => !pagination.cursor || file.path > pagination.cursor).slice(0, pagination.limit);
+  return context.json(success({ items, nextCursor: items.length === pagination.limit ? items.at(-1)?.path ?? "" : null }));
+});
+
+v1.get("/repositories/demo/files/:fileId", (context) => {
+  const file = demoFiles.find((item) => item.id === context.req.param("fileId"));
+  if (!file) throw new AppError("FILE_NOT_FOUND", "File was not found.", 404);
+  return context.json(success(file));
+});
+
+v1.get("/repositories/demo/search", (context) => {
+  const request = searchSchema.parse({
+    query: context.req.query("q") ?? context.req.query("query") ?? "hybrid search",
+    strategy: context.req.query("strategy") ?? "hybrid_graph_rerank",
+    limit: Number(context.req.query("limit") ?? 20)
+  });
+  return context.json(success({ results: filterDemoSearch(request.query, request.limit), cached: false }));
+});
+
+v1.post("/repositories/demo/search", async (context) => {
+  const request = searchSchema.parse(await context.req.json());
+  return context.json(success({ results: filterDemoSearch(request.query, request.limit), cached: false }));
+});
+
+v1.post("/repositories/demo/chat", async (context) => {
+  const request = chatSchema.parse(await context.req.json());
+  return context.json(success({ ...buildDemoAnswer(request.query), conversationId: "demo" }));
+});
+
+async function streamDemoChat(context: Context<AppBindings>) {
+  const request =
+    context.req.method === "GET"
+      ? chatSchema.parse({ query: context.req.query("q") ?? context.req.query("query") ?? "How does hybrid search rank code?", mode: context.req.query("mode") ?? "ask" })
+      : chatSchema.parse(await context.req.json());
+  const answer = buildDemoAnswer(request.query);
+  return streamSSE(context, async (stream) => {
+    await stream.writeSSE({ event: "retrieval_started", data: JSON.stringify({ mode: request.mode }) });
+    await stream.writeSSE({ event: "retrieval_completed", data: JSON.stringify({ chunks: answer.retrieval.chunksRetrieved, files: answer.retrieval.filesUsed }) });
+    await stream.writeSSE({ event: "generation_started", data: JSON.stringify(answer.model) });
+    for (let offset = 0; offset < answer.answer.length; offset += 80) await stream.writeSSE({ event: "token", data: JSON.stringify({ text: answer.answer.slice(offset, offset + 80) }) });
+    for (const citation of answer.citations) await stream.writeSSE({ event: "citation", data: JSON.stringify(citation) });
+    await stream.writeSSE({ event: "completed", data: JSON.stringify({ citations: answer.citations, retrievalConfidence: answer.retrieval.confidence, citationValidity: 1 }) });
+  });
+}
+
+v1.get("/repositories/demo/chat/stream", streamDemoChat);
+v1.post("/repositories/demo/chat/stream", streamDemoChat);
 
 v1.get("/repositories/:id", async (context) => context.json(success(await getAccessibleRepository(context.env.DB, idSchema.parse(context.req.param("id")), context.get("principal")))));
 
