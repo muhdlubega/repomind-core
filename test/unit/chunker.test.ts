@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { chunkParsedFile } from "../../src/indexing/chunking/ast-chunker";
 
 describe("AST-aware chunking", () => {
+  it("indexes an entire unparsed document in overlapping passages with real line ranges", async () => {
+    const lines = Array.from({ length: 350 }, (_, i) => `documentation line ${String(i + 1)}`);
+    const chunks = await chunkParsedFile("repo", "sha", "README.md", "markdown", lines.join("\n"), { symbols: [], imports: [], exports: [], dependencies: [] });
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.at(-1)?.metadata.endLine).toBe(350);
+    for (const chunk of chunks) expect(chunk.content).toBe(lines.slice(chunk.metadata.startLine - 1, chunk.metadata.endLine).join("\n"));
+  });
   it("uses symbol boundaries and stable hashes", async () => {
     const content = "export function login() {\n  return true;\n}";
     const parsed = { symbols: [{ name: "login", qualifiedName: "src/auth.ts:login", type: "function", signature: "export function login()", startLine: 1, endLine: 3, exported: true }], imports: [], exports: ["login"], dependencies: [] };

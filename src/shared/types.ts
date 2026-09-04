@@ -56,7 +56,7 @@ export interface CodeLensaAnswer {
   timing: { retrievalMs: number; generationMs: number; totalMs: number };
 }
 
-export interface IndexJobMessage { kind: "index"; repositoryId: string; jobId: string; githubOwner: string; githubRepo: string }
+export interface IndexJobMessage { cursor?: number; kind: "index"; repositoryId: string; jobId: string; githubOwner: string; githubRepo: string }
 export interface EvaluationJobMessage { kind: "evaluation"; repositoryId: string; runId: string; strategy: "vector" | "lexical" | "hybrid" | "hybrid_graph" | "hybrid_graph_rerank" }
 export type QueueJobMessage = IndexJobMessage | EvaluationJobMessage;
 

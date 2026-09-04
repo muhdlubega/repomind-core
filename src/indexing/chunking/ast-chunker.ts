@@ -26,6 +26,18 @@ export async function chunkParsedFile(repositoryId: string, commitSha: string, p
   const base = { repositoryId, commitSha, path, language, imports: parsed.imports, exports: parsed.exports };
   const chunks = (await Promise.all(parsed.symbols.map((symbol) => chunksForSymbol(base, lines, symbol)))).flat();
   if (chunks.length) return chunks;
-  const contentHash = await sha256(content);
-  return [{ metadata: { ...base, startLine: 1, endLine: Math.max(1, lines.length), contentHash }, content, tokenEstimate: Math.ceil(content.length / 4) }];
+  const passages: GeneratedChunk[] = [];
+  for (let start = 0; start < lines.length;) {
+    let end = start;
+    let length = 0;
+    while (end < lines.length && end - start < 100 && (length < 6000 || end === start)) {
+      length += (lines[end]?.length ?? 0) + 1;
+      end += 1;
+    }
+    const passage = lines.slice(start, end).join("\n");
+    if (passage.trim()) passages.push({ metadata: { ...base, startLine: start + 1, endLine: end, contentHash: await sha256(passage) }, content: passage, tokenEstimate: Math.ceil(passage.length / 4) });
+    if (end === lines.length) break;
+    start = Math.max(start + 1, end - 8);
+  }
+  return passages;
 }

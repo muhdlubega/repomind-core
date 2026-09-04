@@ -26,6 +26,7 @@ app.use("*", async (context, next) => {
   await next();
 });
 app.use("*", bodyLimit({ maxSize: 64 * 1024, onError: (context) => context.json(failure("REQUEST_TOO_LARGE", "Request body is too large."), 413) }));
+app.use("/v1/*", async (context, next) => { context.header("Cache-Control", "no-store"); await next(); });
 app.use("/v1/*", optionalAuth);
 app.get("/health", (context) => context.json(success({ status: "ok", environment: getConfig(context.env).ENVIRONMENT, timestamp: new Date().toISOString() })));
 app.route("/v1", v1);
@@ -51,7 +52,7 @@ export default {
         console.error(JSON.stringify({ message: "queue job failed", kind: message.body.kind, repositoryId: message.body.repositoryId, error: detail }));
         if (message.body.kind === "index") await setJobProgress(env.DB, message.body.jobId, "failed", 100, {}, detail);
         else await env.DB.prepare("UPDATE evaluation_runs SET status = 'failed', metrics_json = ?, completed_at = datetime('now') WHERE id = ?").bind(JSON.stringify({ error: detail.slice(0, 1000) }), message.body.runId).run();
-        message.retry();
+        message.ack();
       }
     }
   }

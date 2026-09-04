@@ -8,7 +8,7 @@ export class OpenAICompatibleProvider implements CodeLensaModelProvider {
   private readonly client: OpenAI;
 
   constructor(readonly id: Exclude<ProviderId, "cloudflare">, readonly model: string, apiKey: string, baseURL: string) {
-    this.client = new OpenAI({ apiKey, baseURL });
+    this.client = new OpenAI({ apiKey, baseURL, timeout: 45_000, maxRetries: 0 });
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {

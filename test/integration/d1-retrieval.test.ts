@@ -22,6 +22,19 @@ async function seed(): Promise<void> {
 beforeEach(seed);
 
 describe("D1 repository lifecycle and retrieval", () => {
+  it("does not retrieve matching code from another repository", async () => {
+    expect(await lexicalSearch(env.DB, "99999999-9999-4999-8999-999999999999", "authenticate", 10)).toEqual([]);
+  });
+
+  it("retrieves documentation for broad questions without symbol or vector indexes", async () => {
+    await env.DB.prepare("UPDATE chunks SET path = 'README.md', symbol_id = NULL WHERE id = '44444444-4444-4444-8444-444444444444'").run();
+    try {
+      const results = await lexicalSearch(env.DB, "11111111-1111-4111-8111-111111111111", "What does this project do?", 10);
+      expect(results[0]?.path).toBe("README.md");
+    } finally {
+      await env.DB.prepare("UPDATE chunks SET path = 'src/auth.ts', symbol_id = '33333333-3333-4333-8333-333333333333' WHERE id = '44444444-4444-4444-8444-444444444444'").run();
+    }
+  });
   it("uses migrated FTS/symbol indexes for lexical retrieval", async () => {
     const results = await lexicalSearch(env.DB, "11111111-1111-4111-8111-111111111111", "authenticate", 10);
     expect(results[0]).toMatchObject({ path: "src/auth.ts", symbol: "authenticate", repositoryId: "11111111-1111-4111-8111-111111111111" });
