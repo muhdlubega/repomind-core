@@ -17,6 +17,7 @@
     "AGENT_PROVIDER": "mistral",
     "AGENT_MODEL": "mistral-small-latest",
     "MISTRAL_MODEL": "mistral-small-latest",
+    "GEMINI_MODEL": "gemini-3.5-flash-lite",
     "AGENT_MAX_ITERATIONS": "6",
     "LANGSMITH_TRACING": "true",
     "LANGSMITH_PROJECT": "codelensa",

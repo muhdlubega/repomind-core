@@ -8,7 +8,7 @@ export class OpenAICompatibleProvider implements CodeLensaModelProvider {
   private readonly client: OpenAI;
 
   constructor(readonly id: Exclude<ProviderId, "cloudflare">, readonly model: string, apiKey: string, baseURL: string) {
-    this.client = new OpenAI({ apiKey, baseURL, timeout: 45_000, maxRetries: 0 });
+    this.client = new OpenAI({ apiKey, baseURL, timeout: 12_000, maxRetries: 0 });
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
@@ -41,9 +41,6 @@ export class OpenAICompatibleProvider implements CodeLensaModelProvider {
   }
 }
 
-export function createGeminiProvider(apiKey: string, model: string): OpenAICompatibleProvider {
-  return new OpenAICompatibleProvider("gemini", model, apiKey, "https://generativelanguage.googleapis.com/v1beta/openai/");
-}
 export function createMistralProvider(apiKey: string, model: string): OpenAICompatibleProvider {
   return new OpenAICompatibleProvider("mistral", model, apiKey, "https://api.mistral.ai/v1");
 }

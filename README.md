@@ -7,18 +7,19 @@ A repository RAG backend for public GitHub repositories, deployed on Cloudflare 
 1. Link a public GitHub URL. GitHub metadata is validated before an indexing job is queued.
 2. The queue consumer processes ten files per message, scheduling continuation batches to stay below Worker request limits. It reads the default branch at a fixed commit. It stores source and documentation in R2 and overlapping, line-numbered passages in D1.
 3. Questions search only that repository's D1 full-text index. Overview questions retrieve README and project configuration.
-4. One Mistral call answers using the retrieved passages. Citations are checked against stored files and line ranges.
+4. Mistral answers using the retrieved passages. If it is rate-limited or unavailable, Gemini 3.5 Flash-Lite takes over through the Google Gen AI SDK. Its bounded agent loop can search only the selected repository, with at most three model rounds. Citations are checked against stored files and line ranges.
 
-There are no demo responses or synthetic repositories. Failures are returned to the caller. Graphs, agent loops, embeddings, and evaluations are not part of the question-answering path. Existing auxiliary modules and Cloudflare bindings are retained for compatibility; no data migration is required.
+There are no demo responses or synthetic repositories. If both providers fail, the error is returned to the caller. Graphs, embeddings, and evaluations are not part of the question-answering path. Existing auxiliary modules and Cloudflare bindings are retained for compatibility; no data migration is required.
 
 ## Setup
 
 Requires Node.js 22+, the D1/R2/KV/Queue resources in wrangler.jsonc, and:
 - GITHUB_TOKEN: token with public repository read access.
 - MISTRAL_API_KEY: Mistral API key. Production uses mistral-small-latest.
+- GEMINI_API_KEY: enables the native Google Gen AI SDK fallback. GEMINI_MODEL defaults to gemini-3.5-flash-lite.
 - FIREBASE_PROJECT_ID: optional authentication configuration.
 
-Local secrets belong in .dev.vars; production secrets must be installed with wrangler secret put. Never commit keys. LangSmith and Gemini are not required by this flow.
+Local secrets belong in .dev.vars; production secrets must be installed with wrangler secret put. Never commit keys. LangSmith is not required by this flow.
 
 Run npm install, npx wrangler d1 migrations apply codelensa --local, then npm run dev.
 Validate with npm run typecheck, npm run lint, npm test, and npm run test:integration.

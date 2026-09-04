@@ -15,7 +15,7 @@ export const runtimeConfigSchema = z.object({
   QUERY_REWRITE_PROVIDER: z.enum(["cloudflare", "gemini", "mistral"]).default("cloudflare"),
   ENABLE_AGENT_FALLBACK: boolString.default("false"),
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().optional(),
+  GEMINI_MODEL: z.string().default("gemini-3.5-flash-lite"),
   MISTRAL_API_KEY: z.string().optional(),
   MISTRAL_MODEL: z.string().optional(),
   AGENT_PROVIDER: z.enum(["cloudflare", "gemini", "mistral"]).default("cloudflare"),
