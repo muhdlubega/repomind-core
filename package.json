@@ -15,8 +15,8 @@
     "check": "npm run typecheck && npm run lint && npm test && npm run test:integration && npm run build"
   },
   "dependencies": {
-    "@google/genai": "^2.21.0",
     "@langchain/core": "^1.2.9",
+    "@langchain/google": "^0.2.4",
     "@langchain/langgraph": "^1.4.13",
     "hono": "^4.9.6",
     "langsmith": "^0.9.0",
